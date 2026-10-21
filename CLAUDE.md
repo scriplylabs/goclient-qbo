@@ -23,7 +23,7 @@ go build ./...
 
 ## Architecture
 
-This is a Go client library for the QuickBooks Online (QBO) REST API. The package name is `quickbooks` and the install path is `github.com/chironlabs/goclient-qbo`.
+This is a Go client library for the QuickBooks Online (QBO) REST API. The package name is `quickbooks` and the install path is `github.com/scriplylabs/goclient-qbo`.
 
 **Core files:**
 - `client.go` — `Client` struct, `NewClient`, and the internal HTTP helpers `req`/`get`/`post`/`query`

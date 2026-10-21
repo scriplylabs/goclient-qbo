@@ -28,4 +28,4 @@ If you depend on the original API surface, you should continue using the upstrea
 
 ## Installation
 
-go get github.com/chironlabs/goclient-qbo
+go get github.com/scriplylabs/goclient-qbo
