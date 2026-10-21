@@ -1,4 +1,4 @@
-module github.com/chironlabs/goclient-qbo
+module github.com/scriplylabs/goclient-qbo
 
 go 1.22
 
