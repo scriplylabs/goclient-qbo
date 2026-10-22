@@ -26,8 +26,8 @@ type TimeActivity struct {
 	TxnDate        *Date          `json:",omitempty"`
 	Hours          *int           `json:",omitempty"`
 	Minutes        *int           `json:",omitempty"`
-	StartTime      *Date          `json:",omitempty"`
-	EndTime        *Date          `json:",omitempty"`
+	StartTime      *DateTime      `json:",omitempty"`
+	EndTime        *DateTime      `json:",omitempty"`
 	BreakHours     *int           `json:",omitempty"`
 	BreakMinutes   *int           `json:",omitempty"`
 	Description    *string        `json:",omitempty"`
@@ -50,8 +50,8 @@ type TimeActivityCreateInput struct {
 	TxnDate        *Date          `json:",omitempty"`
 	Hours          *int           `json:",omitempty"`
 	Minutes        *int           `json:",omitempty"`
-	StartTime      *Date          `json:",omitempty"`
-	EndTime        *Date          `json:",omitempty"`
+	StartTime      *DateTime      `json:",omitempty"`
+	EndTime        *DateTime      `json:",omitempty"`
 	BreakHours     *int           `json:",omitempty"`
 	BreakMinutes   *int           `json:",omitempty"`
 	Description    *string        `json:",omitempty"`

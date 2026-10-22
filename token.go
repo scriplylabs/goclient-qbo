@@ -31,7 +31,12 @@ func (c *Client) RefreshToken(refreshToken string) (t *BearerToken, e error) {
 	urlValues.Set("grant_type", "refresh_token")
 	urlValues.Add("refresh_token", refreshToken)
 
-	req, err := http.NewRequest("POST", c.discoveryAPI.TokenEndpoint, bytes.NewBufferString(urlValues.Encode()))
+	discoveryAPI, err := c.getDiscoveryAPI()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", discoveryAPI.TokenEndpoint, bytes.NewBufferString(urlValues.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +78,12 @@ func (c *Client) RetrieveBearerToken(authorizationCode, redirectURI string) (t *
 	urlValues.Set("grant_type", "authorization_code")
 	urlValues.Add("redirect_uri", redirectURI)
 
-	req, err := http.NewRequest("POST", c.discoveryAPI.TokenEndpoint, bytes.NewBufferString(urlValues.Encode()))
+	discoveryAPI, err := c.getDiscoveryAPI()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", discoveryAPI.TokenEndpoint, bytes.NewBufferString(urlValues.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +120,12 @@ func (c *Client) RevokeToken(refreshToken string) error {
 	urlValues := url.Values{}
 	urlValues.Add("token", refreshToken)
 
-	req, err := http.NewRequest("POST", c.discoveryAPI.RevocationEndpoint, bytes.NewBufferString(urlValues.Encode()))
+	discoveryAPI, err := c.getDiscoveryAPI()
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", discoveryAPI.RevocationEndpoint, bytes.NewBufferString(urlValues.Encode()))
 	if err != nil {
 		return err
 	}

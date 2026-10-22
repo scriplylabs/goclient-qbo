@@ -23,7 +23,7 @@ type Failure struct {
 		}
 		Type string `json:"type"`
 	}
-	Time Date `json:"time"`
+	Time DateTime `json:"time"`
 }
 
 // Error implements the error interface.

@@ -2,6 +2,7 @@ package quickbooks
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -32,7 +33,8 @@ func (m *MaybeDeleted[T]) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &peek); err != nil {
 		return err
 	}
-	if peek.Status == "deleted" {
+	// QuickBooks sends "Deleted"; compare without case in case it ever changes.
+	if strings.EqualFold(peek.Status, "deleted") {
 		m.Deleted = &DeletedEntity{}
 		return json.Unmarshal(data, m.Deleted)
 	}

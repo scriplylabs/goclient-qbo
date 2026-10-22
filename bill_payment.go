@@ -59,13 +59,15 @@ type BillPaymentCreateInput struct {
 
 // CreateBillPayment creates the given BillPayment on the QuickBooks server, returning
 // the resulting BillPayment object.
-func (c *Client) CreateBillPayment(input *BillPaymentCreateInput) (*BillPayment, error) {
+//
+// Pass WithRequestID to make retries of the same create safe.
+func (c *Client) CreateBillPayment(input *BillPaymentCreateInput, opts ...RequestOption) (*BillPayment, error) {
 	var resp struct {
 		BillPayment BillPayment
 		Time        Date
 	}
 
-	if err := c.post("billpayment", input, &resp, nil); err != nil {
+	if err := c.post("billpayment", input, &resp, buildQueryParameters(opts)); err != nil {
 		return nil, err
 	}
 

@@ -2,3 +2,6 @@
 
 # IntelliJ
 .idea
+
+# Sandbox credentials for sandbox_test.go
+token.txt

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -74,6 +75,46 @@ func NewClient(clientID string, clientSecret string, realm string, isProduction 
 	return &client, nil
 }
 
+// NewClientWithEndpoint returns a client that sends API calls to endpoint (a
+// base URL such as "http://127.0.0.1:8080", without "/v3/company/...")
+// instead of ProductionEndpoint or SandboxEndpoint; qbotest.NewServer uses it.
+// Unlike NewClient it doesn't fetch Intuit's discovery document, so the OAuth
+// methods (FindAuthorizationURL, RetrieveBearerToken, RefreshToken,
+// RevokeToken) return an error. A nil token leaves Client unset, for the
+// caller to fill in.
+func NewClientWithEndpoint(endpoint EndpointURL, realm string, minorVersion string, token *BearerToken) (*Client, error) {
+	if minorVersion == "" {
+		minorVersion = "65"
+	}
+
+	apiEndpoint, err := url.Parse(strings.TrimSuffix(endpoint.String(), "/") + "/v3/company/" + realm + "/")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse API endpoint: %v", err)
+	}
+
+	client := Client{
+		endpoint:     apiEndpoint,
+		minorVersion: minorVersion,
+		realm:        realm,
+	}
+
+	if token != nil {
+		client.Client = getHttpClient(token)
+	}
+
+	return &client, nil
+}
+
+// getDiscoveryAPI returns the client's OAuth endpoints, or an error for a client
+// made by NewClientWithEndpoint.
+func (c *Client) getDiscoveryAPI() (*DiscoveryAPI, error) {
+	if c.discoveryAPI == nil {
+		return nil, errors.New("client has no OAuth endpoints; it was made by NewClientWithEndpoint")
+	}
+
+	return c.discoveryAPI, nil
+}
+
 // FindAuthorizationURL compiles the authorization url from the discovery api's auth endpoint.
 //
 // Example: qbClient.FindAuthorizationURL("com.intuit.quickbooks.accounting", "security_token", "https://developer.intuit.com/v2/OAuth2Playground/RedirectUrl")
@@ -82,7 +123,12 @@ func NewClient(clientID string, clientSecret string, realm string, isProduction 
 func (c *Client) FindAuthorizationURL(scope string, state string, redirectURI string) (string, error) {
 	var authorizationURL *url.URL
 
-	authorizationURL, err := url.Parse(c.discoveryAPI.AuthorizationEndpoint)
+	discoveryAPI, err := c.getDiscoveryAPI()
+	if err != nil {
+		return "", err
+	}
+
+	authorizationURL, err = url.Parse(discoveryAPI.AuthorizationEndpoint)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse auth endpoint: %v", err)
 	}
@@ -167,6 +213,35 @@ func (c *Client) req(method string, endpoint string, payloadData any, responseOb
 	}
 
 	return nil
+}
+
+// RequestOption sets an optional query parameter on a request.
+type RequestOption func(queryParameters map[string]string)
+
+// WithRequestID sets QuickBooks' requestid query parameter. When QuickBooks
+// sees a requestid it has seen before for the company, it returns the
+// original response instead of acting again, even if the body differs, so a
+// retried create can't make a second entry. Use one ID per logical operation
+// and reuse it on every retry of that operation.
+//
+// The ID can be at most 50 characters; a longer one is refused with a
+// ValidationFault (code 6000). A UUID fits. Intuit doesn't publish how long
+// QuickBooks remembers an ID, and says a repeat sent while the first request
+// is still being processed isn't guaranteed to match it.
+func WithRequestID(id string) RequestOption {
+	return func(queryParameters map[string]string) {
+		queryParameters["requestid"] = id
+	}
+}
+
+// buildQueryParameters applies opts to a new set of query parameters.
+func buildQueryParameters(opts []RequestOption) map[string]string {
+	params := map[string]string{}
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return params
 }
 
 func (c *Client) get(endpoint string, responseObject interface{}, queryParameters map[string]string) error {
