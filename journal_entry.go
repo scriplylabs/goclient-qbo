@@ -48,7 +48,7 @@ func (c *Client) CreateJournalEntry(input *JournalEntryCreateInput, opts ...Requ
 		Time         Date
 	}
 
-	if err := c.post("journalentry", input, &resp, queryParameters(opts)); err != nil {
+	if err := c.post("journalentry", input, &resp, buildQueryParameters(opts)); err != nil {
 		return nil, err
 	}
 

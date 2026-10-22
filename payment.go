@@ -48,7 +48,7 @@ func (c *Client) CreatePayment(input *PaymentCreateInput, opts ...RequestOption)
 		Time    Date
 	}
 
-	if err := c.post("payment", input, &resp, queryParameters(opts)); err != nil {
+	if err := c.post("payment", input, &resp, buildQueryParameters(opts)); err != nil {
 		return nil, err
 	}
 

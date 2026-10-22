@@ -67,7 +67,7 @@ func (c *Client) CreateBillPayment(input *BillPaymentCreateInput, opts ...Reques
 		Time        Date
 	}
 
-	if err := c.post("billpayment", input, &resp, queryParameters(opts)); err != nil {
+	if err := c.post("billpayment", input, &resp, buildQueryParameters(opts)); err != nil {
 		return nil, err
 	}
 

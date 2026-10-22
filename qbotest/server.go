@@ -3,9 +3,9 @@
 // can be told to fail the next request with a fault QuickBooks returns.
 //
 //	srv, client := qbotest.NewServer(t)
-//	srv.FailNext("journalentry", qbotest.AccountPeriodClosed())
+//	srv.FailNext("journalentry", qbotest.NewAccountPeriodClosedFault())
 //	_, err := client.CreateJournalEntry(input, quickbooks.WithRequestID(key))
-//	body := srv.RequestsTo("journalentry")[0].Body
+//	body := srv.ListRequestsTo("journalentry")[0].Body
 //
 // The fault bodies are copies of what a QuickBooks sandbox returned; the
 // sandbox tests in package quickbooks (go test -tags sandbox) check that they
@@ -41,20 +41,13 @@ type Request struct {
 	// Path is relative to /v3/company/{realm}/, for example "journalentry" or "account/12".
 	Path  string
 	Query map[string][]string
+	// RequestID is the requestid query parameter, or "".
+	RequestID string
 	// Body is the request body exactly as sent.
 	Body []byte
 	// Status is the HTTP status the server answered with, or 0 for a request
 	// that hung until the client gave up.
 	Status int
-}
-
-// RequestID returns the request's requestid query parameter.
-func (r Request) RequestID() string {
-	if v := r.Query["requestid"]; len(v) > 0 {
-		return v[0]
-	}
-
-	return ""
 }
 
 // Fault is a failure the server can be told to return; see FailNext.
@@ -64,30 +57,30 @@ type Fault struct {
 	hang   bool
 }
 
-// ValidationFault returns a 400 ValidationFault with the given code, message and detail.
-func ValidationFault(code, message, detail string) Fault {
+// NewValidationFault returns a 400 NewValidationFault with the given code, message and detail.
+func NewValidationFault(code, message, detail string) Fault {
 	body, _ := json.Marshal(map[string]any{
 		"Fault": map[string]any{
 			"Error": []map[string]string{{"Message": message, "Detail": detail, "code": code, "element": ""}},
 			"type":  "ValidationFault",
 		},
-		"time": timestamp(),
+		"time": formatNow(),
 	})
 
 	return Fault{status: http.StatusBadRequest, body: string(body)}
 }
 
-// AccountPeriodClosed returns the ValidationFault (code 6200) QuickBooks sends
+// NewAccountPeriodClosedFault returns the ValidationFault (code 6200) QuickBooks sends
 // for a transaction dated on or before the company's book close date.
-func AccountPeriodClosed() Fault {
-	return ValidationFault("6200", "Account Period Closed",
+func NewAccountPeriodClosedFault() Fault {
+	return NewValidationFault("6200", "Account Period Closed",
 		"The account period has closed. Txn Date=06/15/2026 is before book closing date=06/30/2026")
 }
 
-// AuthenticationFault returns the 401 QuickBooks sends for an invalid or
+// NewAuthenticationFault returns the 401 QuickBooks sends for an invalid or
 // expired access token. Unlike other faults it uses lowercase keys and gives
 // the time in epoch milliseconds.
-func AuthenticationFault() Fault {
+func NewAuthenticationFault() Fault {
 	return Fault{status: http.StatusUnauthorized, body: fmt.Sprintf(`{"warnings":null,"intuitObject":null,`+
 		`"fault":{"error":[{"message":"message=AuthenticationFailed; errorCode=003200; statusCode=401",`+
 		`"detail":"Token expired","code":"3200","element":null}],"type":"AUTHENTICATION"},`+
@@ -95,8 +88,8 @@ func AuthenticationFault() Fault {
 		`"syncErrorResponse":null,"requestId":null,"time":%d,"status":null,"cdcresponse":[]}`, time.Now().UnixMilli())}
 }
 
-// ServerError returns a 500 with a SystemFault body.
-func ServerError() Fault {
+// NewServerErrorFault returns a 500 with a SystemFault body.
+func NewServerErrorFault() Fault {
 	body, _ := json.Marshal(map[string]any{
 		"Fault": map[string]any{
 			"Error": []map[string]string{{
@@ -106,15 +99,15 @@ func ServerError() Fault {
 			}},
 			"type": "SystemFault",
 		},
-		"time": timestamp(),
+		"time": formatNow(),
 	})
 
 	return Fault{status: http.StatusInternalServerError, body: string(body)}
 }
 
-// Hang returns a fault that never answers: the request waits until the client
+// NewHangFault returns a fault that never answers: the request waits until the client
 // gives up (set the client's Client.Timeout) or the server is closed.
-func Hang() Fault {
+func NewHangFault() Fault {
 	return Fault{hang: true}
 }
 
@@ -192,7 +185,7 @@ func (s *Server) Add(entity string, v any) string {
 		panic("qbotest: unknown entity " + entity)
 	}
 
-	obj, err := toObject(v)
+	obj, err := convertToObject(v)
 	if err != nil {
 		panic("qbotest: " + err.Error())
 	}
@@ -213,18 +206,18 @@ func (s *Server) FailNext(path string, f Fault) {
 	s.faults = append(s.faults, queuedFault{path: path, fault: f})
 }
 
-// Requests returns every request the server has received, in order.
-func (s *Server) Requests() []Request {
+// ListRequests returns every request the server has received, in order.
+func (s *Server) ListRequests() []Request {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	return append([]Request(nil), s.requests...)
 }
 
-// RequestsTo returns the requests to path ("payment", "query"), in order.
-func (s *Server) RequestsTo(path string) []Request {
+// ListRequestsTo returns the requests to path ("payment", "query"), in order.
+func (s *Server) ListRequestsTo(path string) []Request {
 	var out []Request
-	for _, r := range s.Requests() {
+	for _, r := range s.ListRequests() {
 		if r.Path == path {
 			out = append(out, r)
 		}
@@ -233,9 +226,9 @@ func (s *Server) RequestsTo(path string) []Request {
 	return out
 }
 
-// Entities returns the stored entities of a type ("JournalEntry") as JSON, in
+// ListEntities returns the stored entities of a type ("JournalEntry") as JSON, in
 // creation order, without deleted ones.
-func (s *Server) Entities(entity string) []json.RawMessage {
+func (s *Server) ListEntities(entity string) []json.RawMessage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -257,7 +250,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := Request{Method: r.Method, Path: strings.TrimPrefix(r.URL.Path, prefix), Query: r.URL.Query(), Body: body}
+	req := Request{Method: r.Method, Path: strings.TrimPrefix(r.URL.Path, prefix), Query: r.URL.Query(), RequestID: r.URL.Query().Get("requestid"), Body: body}
 
 	s.mu.Lock()
 	index := len(s.requests)
@@ -309,18 +302,18 @@ func (s *Server) handle(req Request) reply {
 
 	switch {
 	case req.Method == http.MethodGet && req.Path == "query":
-		return s.query(first(req.Query["query"]))
+		return s.query(getFirst(req.Query["query"]))
 	case req.Method == http.MethodGet && req.Path == "cdc":
-		return s.changes(first(req.Query["entities"]), first(req.Query["changedSince"]))
+		return s.listChanges(getFirst(req.Query["entities"]), getFirst(req.Query["changedSince"]))
 	case req.Method == http.MethodGet && len(segments) <= 2:
 		return s.read(segments)
 	case req.Method == http.MethodPost && len(segments) == 1:
-		requestID := first(req.Query["requestid"])
+		requestID := getFirst(req.Query["requestid"])
 		if prev, ok := s.replies[requestID]; ok && requestID != "" {
 			return prev
 		}
 
-		rep := s.write(segments[0], first(req.Query["operation"]), first(req.Query["include"]), req.Body)
+		rep := s.write(segments[0], getFirst(req.Query["operation"]), getFirst(req.Query["include"]), req.Body)
 		if requestID != "" && rep.status == http.StatusOK {
 			s.replies[requestID] = rep
 		}
@@ -328,61 +321,61 @@ func (s *Server) handle(req Request) reply {
 		return rep
 	}
 
-	return fault(ValidationFault("4000", "Unsupported request", "qbotest doesn't support "+req.Method+" "+req.Path))
+	return replyWithFault(NewValidationFault("4000", "Unsupported request", "qbotest doesn't support "+req.Method+" "+req.Path))
 }
 
 func (s *Server) read(segments []string) reply {
 	name, ok := entityNames[segments[0]]
 	if !ok {
-		return unknownEntity(segments[0])
+		return replyUnknownEntity(segments[0])
 	}
 
 	// CompanyInfo is read by realm, and Preferences has no Id in its path.
 	if name == "CompanyInfo" || name == "Preferences" {
 		if objs := s.entities[name]; len(objs) > 0 {
-			return entityReply(name, objs[0])
+			return replyWithEntity(name, objs[0])
 		}
 	}
 
 	if len(segments) == 2 {
 		if obj := s.find(name, segments[1]); obj != nil {
-			return entityReply(name, obj)
+			return replyWithEntity(name, obj)
 		}
 	}
 
-	return objectNotFound()
+	return replyObjectNotFound()
 }
 
 func (s *Server) write(path, operation, include string, body []byte) reply {
 	name, ok := entityNames[path]
 	if !ok {
-		return unknownEntity(path)
+		return replyUnknownEntity(path)
 	}
 
 	obj, err := decodeObject(body)
 	if err != nil {
-		return fault(ValidationFault("2010", "Request has invalid or unsupported property", err.Error()))
+		return replyWithFault(NewValidationFault("2010", "Request has invalid or unsupported property", err.Error()))
 	}
 
 	id, _ := obj["Id"].(string)
 	if id == "" {
 		if operation != "" {
-			return fault(ValidationFault("2020", "Required param missing, need to supply the required value for the API",
+			return replyWithFault(NewValidationFault("2020", "Required param missing, need to supply the required value for the API",
 				"Required parameter Id is missing in the request"))
 		}
 
-		return entityReply(name, s.store(name, obj))
+		return replyWithEntity(name, s.store(name, obj))
 	}
 
 	existing := s.find(name, id)
 	if existing == nil {
-		return objectNotFound()
+		return replyObjectNotFound()
 	}
 
 	switch {
 	case operation == "delete":
 		s.remove(name, id)
-		return entityReply(name, map[string]any{"domain": "QBO", "status": "Deleted", "Id": id})
+		return replyWithEntity(name, map[string]any{"domain": "QBO", "status": "Deleted", "Id": id})
 	case operation == "void" || include == "void":
 		existing["TotalAmt"] = json.Number("0")
 		existing["PrivateNote"] = "Voided"
@@ -400,7 +393,7 @@ func (s *Server) write(path, operation, include string, body []byte) reply {
 			}
 		}
 	default:
-		return fault(ValidationFault("4000", "Unsupported operation", "qbotest doesn't support operation "+operation))
+		return replyWithFault(NewValidationFault("4000", "Unsupported operation", "qbotest doesn't support operation "+operation))
 	}
 
 	syncToken, _ := strconv.Atoi(fmt.Sprint(existing["SyncToken"]))
@@ -409,7 +402,7 @@ func (s *Server) write(path, operation, include string, body []byte) reply {
 	existing["sparse"] = false
 	setMetaData(existing, false)
 
-	return entityReply(name, existing)
+	return replyWithEntity(name, existing)
 }
 
 var (
@@ -428,17 +421,17 @@ var (
 func (s *Server) query(q string) reply {
 	m := queryPattern.FindStringSubmatch(q)
 	if m == nil {
-		return queryError(q)
+		return replyQueryError(q)
 	}
 
 	name, ok := entityNames[strings.ToLower(m[2])]
 	if !ok {
-		return queryError(q)
+		return replyQueryError(q)
 	}
 
 	filters, mentionsActive, ok := parseWhere(m[3])
 	if !ok {
-		return queryError(q)
+		return replyQueryError(q)
 	}
 
 	var matched []map[string]any
@@ -452,7 +445,7 @@ func (s *Server) query(q string) reply {
 	}
 
 	if strings.EqualFold(m[1], "COUNT(*)") {
-		return ok200(map[string]any{"QueryResponse": map[string]any{"totalCount": len(matched)}, "time": timestamp()})
+		return replyOK(map[string]any{"QueryResponse": map[string]any{"totalCount": len(matched)}, "time": formatNow()})
 	}
 
 	start, maxResults := 1, 100
@@ -475,7 +468,7 @@ func (s *Server) query(q string) reply {
 		resp["maxResults"] = len(page)
 	}
 
-	return ok200(map[string]any{"QueryResponse": resp, "time": timestamp()})
+	return replyOK(map[string]any{"QueryResponse": resp, "time": formatNow()})
 }
 
 type filter struct {
@@ -549,24 +542,24 @@ func lookup(m map[string]any, field string) any {
 	return nil
 }
 
-// changes answers a change data capture request: entities updated since
+// listChanges answers a change data capture request: entities updated since
 // changedSince, and those deleted since, with "status": "Deleted".
-func (s *Server) changes(entities, changedSince string) reply {
+func (s *Server) listChanges(entities, changedSince string) reply {
 	since, err := time.Parse(time.RFC3339, changedSince)
 	if err != nil {
-		return fault(ValidationFault("2030", "Invalid parameter", "changedSince: "+err.Error()))
+		return replyWithFault(NewValidationFault("2030", "Invalid parameter", "changedSince: "+err.Error()))
 	}
 
 	var responses []map[string]any
 	for _, entity := range strings.Split(entities, ",") {
 		name, ok := entityNames[strings.ToLower(strings.TrimSpace(entity))]
 		if !ok {
-			return unknownEntity(entity)
+			return replyUnknownEntity(entity)
 		}
 
 		var changed []map[string]any
 		for _, obj := range s.entities[name] {
-			if updated(obj).After(since) || updated(obj).Equal(since) {
+			if getLastUpdated(obj).After(since) || getLastUpdated(obj).Equal(since) {
 				changed = append(changed, obj)
 			}
 		}
@@ -584,10 +577,10 @@ func (s *Server) changes(entities, changedSince string) reply {
 		responses = append(responses, resp)
 	}
 
-	return ok200(map[string]any{"CDCResponse": []map[string]any{{"QueryResponse": responses}}, "time": timestamp()})
+	return replyOK(map[string]any{"CDCResponse": []map[string]any{{"QueryResponse": responses}}, "time": formatNow()})
 }
 
-func updated(obj map[string]any) time.Time {
+func getLastUpdated(obj map[string]any) time.Time {
 	meta, _ := obj["MetaData"].(map[string]any)
 	t, _ := time.Parse(time.RFC3339, fmt.Sprint(meta["LastUpdatedTime"]))
 
@@ -614,7 +607,7 @@ func (s *Server) store(name string, obj map[string]any) map[string]any {
 	setMetaData(obj, true)
 
 	s.entities[name] = append(s.entities[name], obj)
-	sort.SliceStable(s.entities[name], func(i, j int) bool { return idLess(s.entities[name][i], s.entities[name][j]) })
+	sort.SliceStable(s.entities[name], func(i, j int) bool { return isIDLess(s.entities[name][i], s.entities[name][j]) })
 
 	return obj
 }
@@ -650,7 +643,7 @@ func setMetaData(obj map[string]any, create bool) {
 	obj["MetaData"] = meta
 }
 
-func idLess(a, b map[string]any) bool {
+func isIDLess(a, b map[string]any) bool {
 	x, errX := strconv.Atoi(fmt.Sprint(a["Id"]))
 	y, errY := strconv.Atoi(fmt.Sprint(b["Id"]))
 	if errX != nil || errY != nil {
@@ -660,7 +653,7 @@ func idLess(a, b map[string]any) bool {
 	return x < y
 }
 
-func toObject(v any) (map[string]any, error) {
+func convertToObject(v any) (map[string]any, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
@@ -685,37 +678,37 @@ func decodeObject(b []byte) (map[string]any, error) {
 	return obj, nil
 }
 
-func entityReply(name string, obj map[string]any) reply {
-	return ok200(map[string]any{name: obj, "time": timestamp()})
+func replyWithEntity(name string, obj map[string]any) reply {
+	return replyOK(map[string]any{name: obj, "time": formatNow()})
 }
 
-func ok200(v any) reply {
+func replyOK(v any) reply {
 	b, _ := json.Marshal(v)
 
 	return reply{status: http.StatusOK, body: b}
 }
 
-func fault(f Fault) reply {
+func replyWithFault(f Fault) reply {
 	return reply{status: f.status, body: []byte(f.body)}
 }
 
-func objectNotFound() reply {
-	return fault(ValidationFault("610", "Object Not Found", "Object Not Found : Something you're trying to use has been made inactive. Check the fields with accounts, customers, items, vendors or employees."))
+func replyObjectNotFound() reply {
+	return replyWithFault(NewValidationFault("610", "Object Not Found", "Object Not Found : Something you're trying to use has been made inactive. Check the fields with accounts, customers, items, vendors or employees."))
 }
 
-func unknownEntity(path string) reply {
-	return fault(ValidationFault("4000", "Unsupported entity", "qbotest doesn't know the entity "+path))
+func replyUnknownEntity(path string) reply {
+	return replyWithFault(NewValidationFault("4000", "Unsupported entity", "qbotest doesn't know the entity "+path))
 }
 
-func queryError(q string) reply {
-	return fault(ValidationFault("4000", "Error parsing query", "QueryParserError: qbotest can't run the query "+q))
+func replyQueryError(q string) reply {
+	return replyWithFault(NewValidationFault("4000", "Error parsing query", "QueryParserError: qbotest can't run the query "+q))
 }
 
-func timestamp() string {
+func formatNow() string {
 	return time.Now().Format("2006-01-02T15:04:05.000-07:00")
 }
 
-func first(values []string) string {
+func getFirst(values []string) string {
 	if len(values) == 0 {
 		return ""
 	}

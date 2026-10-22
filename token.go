@@ -31,7 +31,7 @@ func (c *Client) RefreshToken(refreshToken string) (t *BearerToken, e error) {
 	urlValues.Set("grant_type", "refresh_token")
 	urlValues.Add("refresh_token", refreshToken)
 
-	discoveryAPI, err := c.discovery()
+	discoveryAPI, err := c.getDiscoveryAPI()
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (c *Client) RetrieveBearerToken(authorizationCode, redirectURI string) (t *
 	urlValues.Set("grant_type", "authorization_code")
 	urlValues.Add("redirect_uri", redirectURI)
 
-	discoveryAPI, err := c.discovery()
+	discoveryAPI, err := c.getDiscoveryAPI()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (c *Client) RevokeToken(refreshToken string) error {
 	urlValues := url.Values{}
 	urlValues.Add("token", refreshToken)
 
-	discoveryAPI, err := c.discovery()
+	discoveryAPI, err := c.getDiscoveryAPI()
 	if err != nil {
 		return err
 	}

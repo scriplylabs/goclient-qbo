@@ -105,9 +105,9 @@ func NewClientWithEndpoint(endpoint EndpointURL, realm string, minorVersion stri
 	return &client, nil
 }
 
-// discovery returns the client's OAuth endpoints, or an error for a client
+// getDiscoveryAPI returns the client's OAuth endpoints, or an error for a client
 // made by NewClientWithEndpoint.
-func (c *Client) discovery() (*DiscoveryAPI, error) {
+func (c *Client) getDiscoveryAPI() (*DiscoveryAPI, error) {
 	if c.discoveryAPI == nil {
 		return nil, errors.New("client has no OAuth endpoints; it was made by NewClientWithEndpoint")
 	}
@@ -123,7 +123,7 @@ func (c *Client) discovery() (*DiscoveryAPI, error) {
 func (c *Client) FindAuthorizationURL(scope string, state string, redirectURI string) (string, error) {
 	var authorizationURL *url.URL
 
-	discoveryAPI, err := c.discovery()
+	discoveryAPI, err := c.getDiscoveryAPI()
 	if err != nil {
 		return "", err
 	}
@@ -234,8 +234,8 @@ func WithRequestID(id string) RequestOption {
 	}
 }
 
-// queryParameters applies opts to a new set of query parameters.
-func queryParameters(opts []RequestOption) map[string]string {
+// buildQueryParameters applies opts to a new set of query parameters.
+func buildQueryParameters(opts []RequestOption) map[string]string {
 	params := map[string]string{}
 	for _, opt := range opts {
 		opt(params)

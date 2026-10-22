@@ -30,7 +30,7 @@ import (
 
 const sandboxNote = "goclient-qbo sandbox test"
 
-func sandboxClient(t *testing.T) *Client {
+func newSandboxClient(t *testing.T) *Client {
 	t.Helper()
 
 	raw, err := os.ReadFile("token.txt")
@@ -65,7 +65,7 @@ type sandboxRefs struct {
 	expense, bank, ar, ap, customer, vendor ReferenceType
 }
 
-func sandboxLookup(t *testing.T, c *Client) sandboxRefs {
+func lookUpSandboxRefs(t *testing.T, c *Client) sandboxRefs {
 	t.Helper()
 
 	first := func(entity, where string) ReferenceType {
@@ -93,11 +93,11 @@ func sandboxLookup(t *testing.T, c *Client) sandboxRefs {
 	}
 }
 
-func sandboxToday() *Date {
+func newTodayDate() *Date {
 	return &Date{time.Now()}
 }
 
-func jeLine(amount json.Number, posting string, account ReferenceType, entity *EntityTypeRef) Line {
+func newJELine(amount json.Number, posting string, account ReferenceType, entity *EntityTypeRef) Line {
 	return Line{Amount: amount, DetailType: "JournalEntryLineDetail", JournalEntryLineDetail: JournalEntryLineDetail{
 		PostingType: posting, AccountRef: account, Entity: entity,
 	}}
@@ -142,13 +142,13 @@ func requireFault(t *testing.T, err error, faultType string, code string) Failur
 }
 
 func TestSandboxJournalEntry(t *testing.T) {
-	c := sandboxClient(t)
-	refs := sandboxLookup(t, c)
-	today := sandboxToday()
+	c := newSandboxClient(t)
+	refs := lookUpSandboxRefs(t, c)
+	today := newTodayDate()
 
 	je, err := createJE(t, c, &JournalEntryCreateInput{TxnDate: today, Line: []Line{
-		jeLine("10.00", "Debit", refs.expense, nil),
-		jeLine("10.00", "Credit", refs.bank, nil),
+		newJELine("10.00", "Debit", refs.expense, nil),
+		newJELine("10.00", "Credit", refs.bank, nil),
 	}})
 	require.NoError(t, err)
 
@@ -163,8 +163,8 @@ func TestSandboxJournalEntry(t *testing.T) {
 
 // QuickBooks takes the date part of a TxnDate as written, ignoring a time and offset.
 func TestSandboxTxnDateIgnoresTime(t *testing.T) {
-	c := sandboxClient(t)
-	refs := sandboxLookup(t, c)
+	c := newSandboxClient(t)
+	refs := lookUpSandboxRefs(t, c)
 	day := time.Now().Format("2006-01-02")
 
 	for _, suffix := range []string{"T02:00:00Z", "T23:30:00-07:00", "T00:00:00+14:00"} {
@@ -184,12 +184,12 @@ func TestSandboxTxnDateIgnoresTime(t *testing.T) {
 }
 
 func TestSandboxRequestID(t *testing.T) {
-	c := sandboxClient(t)
-	refs := sandboxLookup(t, c)
+	c := newSandboxClient(t)
+	refs := lookUpSandboxRefs(t, c)
 	requestID := fmt.Sprintf("goclient-qbo-%d", time.Now().UnixNano())
 	entry := func(amount json.Number) *JournalEntryCreateInput {
-		return &JournalEntryCreateInput{TxnDate: sandboxToday(), Line: []Line{
-			jeLine(amount, "Debit", refs.expense, nil), jeLine(amount, "Credit", refs.bank, nil),
+		return &JournalEntryCreateInput{TxnDate: newTodayDate(), Line: []Line{
+			newJELine(amount, "Debit", refs.expense, nil), newJELine(amount, "Credit", refs.bank, nil),
 		}}
 	}
 
@@ -211,49 +211,49 @@ func TestSandboxRequestID(t *testing.T) {
 }
 
 func TestSandboxContactLines(t *testing.T) {
-	c := sandboxClient(t)
-	refs := sandboxLookup(t, c)
+	c := newSandboxClient(t)
+	refs := lookUpSandboxRefs(t, c)
 
-	_, err := createJE(t, c, &JournalEntryCreateInput{TxnDate: sandboxToday(), Line: []Line{
-		jeLine("4.00", "Debit", refs.ar, &EntityTypeRef{Type: "Customer", EntityRef: refs.customer}),
-		jeLine("4.00", "Credit", refs.bank, nil),
-		jeLine("6.00", "Debit", refs.bank, nil),
-		jeLine("6.00", "Credit", refs.ap, &EntityTypeRef{Type: "Vendor", EntityRef: refs.vendor}),
+	_, err := createJE(t, c, &JournalEntryCreateInput{TxnDate: newTodayDate(), Line: []Line{
+		newJELine("4.00", "Debit", refs.ar, &EntityTypeRef{Type: "Customer", EntityRef: refs.customer}),
+		newJELine("4.00", "Credit", refs.bank, nil),
+		newJELine("6.00", "Debit", refs.bank, nil),
+		newJELine("6.00", "Credit", refs.ap, &EntityTypeRef{Type: "Vendor", EntityRef: refs.vendor}),
 	}})
 	require.NoError(t, err, "A/R and A/P lines that name the contact")
 
-	_, err = createJE(t, c, &JournalEntryCreateInput{TxnDate: sandboxToday(), Line: []Line{
-		jeLine("4.00", "Debit", refs.ar, nil), jeLine("4.00", "Credit", refs.bank, nil),
+	_, err = createJE(t, c, &JournalEntryCreateInput{TxnDate: newTodayDate(), Line: []Line{
+		newJELine("4.00", "Debit", refs.ar, nil), newJELine("4.00", "Credit", refs.bank, nil),
 	}})
 	requireFault(t, err, "ValidationFault", "6000")
 
-	_, err = createJE(t, c, &JournalEntryCreateInput{TxnDate: sandboxToday(), Line: []Line{
-		jeLine("4.00", "Debit", refs.expense, nil), jeLine("5.00", "Credit", refs.bank, nil),
+	_, err = createJE(t, c, &JournalEntryCreateInput{TxnDate: newTodayDate(), Line: []Line{
+		newJELine("4.00", "Debit", refs.expense, nil), newJELine("5.00", "Credit", refs.bank, nil),
 	}})
 	requireFault(t, err, "ValidationFault", "2300")
 }
 
 func TestSandboxPaymentAndBillPayment(t *testing.T) {
-	c := sandboxClient(t)
-	refs := sandboxLookup(t, c)
+	c := newSandboxClient(t)
+	refs := lookUpSandboxRefs(t, c)
 	note := sandboxNote
 
 	payment, err := c.CreatePayment(&PaymentCreateInput{
-		CustomerRef: refs.customer, TotalAmt: "5.00", TxnDate: sandboxToday(), DepositToAccountRef: &refs.bank,
+		CustomerRef: refs.customer, TotalAmt: "5.00", TxnDate: newTodayDate(), DepositToAccountRef: &refs.bank,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, c.DeletePayment(payment)) })
 	assert.Equal(t, refs.bank.Value, payment.DepositToAccountRef.Value)
 	assertAmount(t, 5, payment.UnappliedAmt)
 
-	bill, err := c.CreateBill(&BillCreateInput{VendorRef: refs.vendor, TxnDate: sandboxToday(), PrivateNote: &note, Line: []Line{{
+	bill, err := c.CreateBill(&BillCreateInput{VendorRef: refs.vendor, TxnDate: newTodayDate(), PrivateNote: &note, Line: []Line{{
 		Amount: "5.00", DetailType: "AccountBasedExpenseLineDetail",
 		AccountBasedExpenseLineDetail: AccountBasedExpenseLineDetail{AccountRef: refs.expense},
 	}}})
 	require.NoError(t, err)
 
 	billPayment, err := c.CreateBillPayment(&BillPaymentCreateInput{
-		VendorRef: refs.vendor, PayType: "Check", TotalAmt: "5.00", TxnDate: sandboxToday(), PrivateNote: &note,
+		VendorRef: refs.vendor, PayType: "Check", TotalAmt: "5.00", TxnDate: newTodayDate(), PrivateNote: &note,
 		CheckPayment: &BillPaymentCheckPayment{BankAccountRef: refs.bank},
 		Line:         []PaymentLine{{Amount: "5.00", LinkedTxn: []LinkedTxn{{TxnID: bill.ID, TxnType: "Bill"}}}},
 	})
@@ -264,14 +264,14 @@ func TestSandboxPaymentAndBillPayment(t *testing.T) {
 	assert.Equal(t, "Check", billPayment.PayType)
 
 	_, err = c.CreateBillPayment(&BillPaymentCreateInput{
-		VendorRef: refs.vendor, PayType: "Check", TotalAmt: "5.00", TxnDate: sandboxToday(),
+		VendorRef: refs.vendor, PayType: "Check", TotalAmt: "5.00", TxnDate: newTodayDate(),
 		CheckPayment: &BillPaymentCheckPayment{BankAccountRef: refs.bank},
 	})
 	requireFault(t, err, "ValidationFault", "2020")
 }
 
 func TestSandboxFaults(t *testing.T) {
-	c := sandboxClient(t)
+	c := newSandboxClient(t)
 
 	t.Run("bad token", func(t *testing.T) {
 		bad, err := NewClientWithEndpoint(SandboxEndpoint, c.realm, "", &BearerToken{AccessToken: "not-a-real-token"})
@@ -294,9 +294,9 @@ func TestSandboxFaults(t *testing.T) {
 			t.Skip("the sandbox company has no book close date; set one to run this")
 		}
 
-		refs := sandboxLookup(t, c)
+		refs := lookUpSandboxRefs(t, c)
 		_, err := createJE(t, c, &JournalEntryCreateInput{TxnDate: &Date{closed.AddDate(0, 0, -1)}, Line: []Line{
-			jeLine("1.00", "Debit", refs.expense, nil), jeLine("1.00", "Credit", refs.bank, nil),
+			newJELine("1.00", "Debit", refs.expense, nil), newJELine("1.00", "Credit", refs.bank, nil),
 		}})
 		requireFault(t, err, "ValidationFault", "6200")
 	})
@@ -304,12 +304,12 @@ func TestSandboxFaults(t *testing.T) {
 
 // GetChangedEntities reports an entity deleted in QuickBooks as Deleted.
 func TestSandboxChangedEntitiesDeleted(t *testing.T) {
-	c := sandboxClient(t)
-	refs := sandboxLookup(t, c)
+	c := newSandboxClient(t)
+	refs := lookUpSandboxRefs(t, c)
 	since := time.Now().Add(-time.Minute)
 
 	payment, err := c.CreatePayment(&PaymentCreateInput{
-		CustomerRef: refs.customer, TotalAmt: "1.00", TxnDate: sandboxToday(), DepositToAccountRef: &refs.bank,
+		CustomerRef: refs.customer, TotalAmt: "1.00", TxnDate: newTodayDate(), DepositToAccountRef: &refs.bank,
 	})
 	require.NoError(t, err)
 	require.NoError(t, c.DeletePayment(payment))

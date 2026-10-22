@@ -118,7 +118,7 @@ func (c *Client) DownloadAttachable(id string) (s string, e error) {
 
 ### Optional request parameters
 
-Methods that take an optional query parameter accept `opts ...RequestOption` and pass `queryParameters(opts)` to `post`/`get`; `WithRequestID` is the first. Creates that post money (`CreatePayment`, `CreateBillPayment`, `CreateJournalEntry`) take it today.
+Methods that take an optional query parameter accept `opts ...RequestOption` and pass `buildQueryParameters(opts)` to `post`/`get`; `WithRequestID` is the first. Creates that post money (`CreatePayment`, `CreateBillPayment`, `CreateJournalEntry`) take it today.
 
 ### Faults
 
