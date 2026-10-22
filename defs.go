@@ -1,6 +1,10 @@
 package quickbooks
 
-import "time"
+import (
+	"fmt"
+	"strconv"
+	"time"
+)
 
 type CustomField struct {
 	DefinitionID string `json:"DefinitionId,omitempty"`
@@ -9,18 +13,24 @@ type CustomField struct {
 	Name         string `json:"Name,omitempty"`
 }
 
-// Date represents a Quickbooks date
+// Date represents a Quickbooks date (xs:date), such as TxnDate.
+// It is written as "2006-01-02"; QuickBooks ignores any time of day sent with one.
 type Date struct {
 	time.Time `json:",omitempty"`
 }
 
-// UnmarshalJSON removes time from parsed date
+// MarshalJSON writes the date without a time of day.
+func (d Date) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + d.Format(secondFormat) + `"`), nil
+}
+
+// UnmarshalJSON accepts "2006-01-02" or an RFC 3339 date and time.
 func (d *Date) UnmarshalJSON(b []byte) (err error) {
 	if b[0] == '"' && b[len(b)-1] == '"' {
 		b = b[1 : len(b)-1]
 	}
 
-	d.Time, err = time.Parse(format, string(b))
+	d.Time, err = time.Parse(time.RFC3339, string(b))
 	if err != nil {
 		d.Time, err = time.Parse(secondFormat, string(b))
 	}
@@ -29,6 +39,50 @@ func (d *Date) UnmarshalJSON(b []byte) (err error) {
 }
 
 func (d Date) String() string {
+	return d.Format(format)
+}
+
+// DateTime represents a Quickbooks date and time (xs:dateTime), such as
+// MetaData.CreateTime or TimeActivity.StartTime. It is written as RFC 3339.
+type DateTime struct {
+	time.Time `json:",omitempty"`
+}
+
+// MarshalJSON writes the date and time as RFC 3339.
+func (d DateTime) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + d.Format(time.RFC3339Nano) + `"`), nil
+}
+
+// UnmarshalJSON accepts an RFC 3339 string, a "2006-01-02" string, or a number
+// of milliseconds since the Unix epoch, which QuickBooks sends as the time of
+// an authentication fault.
+func (d *DateTime) UnmarshalJSON(b []byte) (err error) {
+	if string(b) == "null" {
+		return nil
+	}
+
+	if b[0] != '"' {
+		ms, err := strconv.ParseInt(string(b), 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid date and time %s: %v", b, err)
+		}
+
+		d.Time = time.UnixMilli(ms)
+
+		return nil
+	}
+
+	b = b[1 : len(b)-1]
+
+	d.Time, err = time.Parse(time.RFC3339, string(b))
+	if err != nil {
+		d.Time, err = time.Parse(secondFormat, string(b))
+	}
+
+	return err
+}
+
+func (d DateTime) String() string {
 	return d.Format(format)
 }
 
@@ -73,8 +127,8 @@ type MemoRef struct {
 
 // MetaData is a timestamp of genesis and last change of a Quickbooks object
 type MetaData struct {
-	CreateTime      Date `json:",omitempty"`
-	LastUpdatedTime Date `json:",omitempty"`
+	CreateTime      DateTime `json:",omitempty"`
+	LastUpdatedTime DateTime `json:",omitempty"`
 }
 
 // Address represents a QuickBooks address.

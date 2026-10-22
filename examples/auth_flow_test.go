@@ -1,10 +1,14 @@
+//go:build examples
+
+// These examples call Intuit with placeholder credentials; fill them in and
+// run with: go test -tags examples ./examples
 package examples
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/rwestlund/quickbooks-go"
+	quickbooks "github.com/scriplylabs/goclient-qbo"
 	"github.com/stretchr/testify/require"
 )
 

@@ -82,3 +82,21 @@ func TestGetChangedEntities(t *testing.T) {
 	assert.Empty(t, result.Bills)
 	assert.Empty(t, result.Vendors)
 }
+
+// QuickBooks capitalises the status of a deleted entity (sandbox, 2026-10-22).
+func TestGetChangedEntitiesCapitalisedDeleted(t *testing.T) {
+	const response = `{"CDCResponse":[{"QueryResponse":[{"Payment":[
+		{"domain":"QBO","status":"Deleted","Id":"154","MetaData":{"LastUpdatedTime":"2026-10-22T11:41:17-07:00"}}
+	],"maxResults":1,"totalCount":1}]}],"time":"2026-10-22T11:50:00.000-07:00"}`
+
+	client, _ := NewTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(response))
+	})
+
+	result, err := client.GetChangedEntities([]string{"Payment"}, time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+	require.Len(t, result.Payments, 1)
+	assert.Nil(t, result.Payments[0].Entity)
+	require.NotNil(t, result.Payments[0].Deleted)
+	assert.Equal(t, "154", result.Payments[0].Deleted.ID)
+}

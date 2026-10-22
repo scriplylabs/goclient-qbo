@@ -88,7 +88,7 @@ type InvoiceCreateInput struct {
 
 type DeliveryInfo struct {
 	DeliveryType string
-	DeliveryTime Date
+	DeliveryTime DateTime
 }
 
 type LinkedTxn struct {
@@ -155,6 +155,52 @@ type Line struct {
 	JournalEntryLineDetail        JournalEntryLineDetail       `json:",omitempty"`
 	ItemBasedExpenseLineDetail    ItemBasedExpenseLineDetail   `json:",omitempty"`
 	GroupLineDetail               *GroupLineDetail             `json:",omitempty"`
+}
+
+// MarshalJSON writes only the line detail that DetailType names, plus
+// GroupLineDetail when it is set. The detail fields are structs, which
+// omitempty never omits, so without this every line would carry every kind of
+// detail. A DetailType with no matching field (DescriptionOnly,
+// SubTotalLineDetail) writes no detail.
+func (l Line) MarshalJSON() ([]byte, error) {
+	out := struct {
+		ID                            string                         `json:"Id,omitempty"`
+		LineNum                       int                            `json:",omitempty"`
+		Description                   string                         `json:",omitempty"`
+		Amount                        json.Number
+		DetailType                    string
+		AccountBasedExpenseLineDetail *AccountBasedExpenseLineDetail `json:",omitempty"`
+		SalesItemLineDetail           *SalesItemLineDetail           `json:",omitempty"`
+		DiscountLineDetail            *DiscountLineDetail            `json:",omitempty"`
+		TaxLineDetail                 *TaxLineDetail                 `json:",omitempty"`
+		JournalEntryLineDetail        *JournalEntryLineDetail        `json:",omitempty"`
+		ItemBasedExpenseLineDetail    *ItemBasedExpenseLineDetail    `json:",omitempty"`
+		GroupLineDetail               *GroupLineDetail               `json:",omitempty"`
+	}{
+		ID:              l.ID,
+		LineNum:         l.LineNum,
+		Description:     l.Description,
+		Amount:          l.Amount,
+		DetailType:      l.DetailType,
+		GroupLineDetail: l.GroupLineDetail,
+	}
+
+	switch l.DetailType {
+	case "AccountBasedExpenseLineDetail":
+		out.AccountBasedExpenseLineDetail = &l.AccountBasedExpenseLineDetail
+	case "SalesItemLineDetail":
+		out.SalesItemLineDetail = &l.SalesItemLineDetail
+	case "DiscountLineDetail":
+		out.DiscountLineDetail = &l.DiscountLineDetail
+	case "TaxLineDetail":
+		out.TaxLineDetail = &l.TaxLineDetail
+	case "JournalEntryLineDetail":
+		out.JournalEntryLineDetail = &l.JournalEntryLineDetail
+	case "ItemBasedExpenseLineDetail":
+		out.ItemBasedExpenseLineDetail = &l.ItemBasedExpenseLineDetail
+	}
+
+	return json.Marshal(out)
 }
 
 // GroupLineDetail holds a bundle (group item) line. The bundle's component

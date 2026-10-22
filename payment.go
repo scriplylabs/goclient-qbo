@@ -40,13 +40,15 @@ type PaymentCreateInput struct {
 }
 
 // CreatePayment creates the given payment within QuickBooks.
-func (c *Client) CreatePayment(input *PaymentCreateInput) (*Payment, error) {
+//
+// Pass WithRequestID to make retries of the same create safe.
+func (c *Client) CreatePayment(input *PaymentCreateInput, opts ...RequestOption) (*Payment, error) {
 	var resp struct {
 		Payment Payment
 		Time    Date
 	}
 
-	if err := c.post("payment", input, &resp, nil); err != nil {
+	if err := c.post("payment", input, &resp, queryParameters(opts)); err != nil {
 		return nil, err
 	}
 

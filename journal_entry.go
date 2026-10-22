@@ -40,13 +40,15 @@ type JournalEntryCreateInput struct {
 
 // CreateJournalEntry creates the given JournalEntry on the QuickBooks server, returning
 // the resulting JournalEntry object.
-func (c *Client) CreateJournalEntry(input *JournalEntryCreateInput) (*JournalEntry, error) {
+//
+// Pass WithRequestID to make retries of the same create safe.
+func (c *Client) CreateJournalEntry(input *JournalEntryCreateInput, opts ...RequestOption) (*JournalEntry, error) {
 	var resp struct {
 		JournalEntry JournalEntry
 		Time         Date
 	}
 
-	if err := c.post("journalentry", input, &resp, nil); err != nil {
+	if err := c.post("journalentry", input, &resp, queryParameters(opts)); err != nil {
 		return nil, err
 	}
 
