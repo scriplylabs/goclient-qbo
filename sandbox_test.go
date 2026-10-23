@@ -62,7 +62,7 @@ func newSandboxClient(t *testing.T) *Client {
 
 // sandboxRefs are accounts and contacts looked up in the sandbox company.
 type sandboxRefs struct {
-	expense, bank, ar, ap, customer, vendor ReferenceType
+	expense, income, bank, ar, ap, customer, vendor, item ReferenceType
 }
 
 func lookUpSandboxRefs(t *testing.T, c *Client) sandboxRefs {
@@ -85,11 +85,13 @@ func lookUpSandboxRefs(t *testing.T, c *Client) sandboxRefs {
 
 	return sandboxRefs{
 		expense:  first("Account", "WHERE AccountType = 'Expense'"),
+		income:   first("Account", "WHERE AccountType = 'Income'"),
 		bank:     first("Account", "WHERE AccountType = 'Bank'"),
 		ar:       first("Account", "WHERE AccountType = 'Accounts Receivable'"),
 		ap:       first("Account", "WHERE AccountType = 'Accounts Payable'"),
 		customer: first("Customer", ""),
 		vendor:   first("Vendor", ""),
+		item:     first("Item", "WHERE Type = 'Service'"),
 	}
 }
 
@@ -334,4 +336,56 @@ func TestSandboxChangedEntitiesDeleted(t *testing.T) {
 	}
 
 	require.NotNil(t, deleted, "deleted payment %s not in the change feed", payment.ID)
+}
+
+// Payment, Deposit, CreditMemo and Estimate keep the PrivateNote they are
+// created with, and a deposit banks a payment and takes a direct line.
+func TestSandboxPrivateNote(t *testing.T) {
+	c := newSandboxClient(t)
+	refs := lookUpSandboxRefs(t, c)
+	note := sandboxNote
+	salesLines := []Line{{Amount: "5.00", DetailType: "SalesItemLineDetail", SalesItemLineDetail: SalesItemLineDetail{ItemRef: &refs.item}}}
+
+	// With no DepositToAccountRef the payment waits in Undeposited Funds,
+	// for the deposit to bank it.
+	payment, err := c.CreatePayment(&PaymentCreateInput{CustomerRef: refs.customer, TotalAmt: "5.00", TxnDate: newTodayDate(), PrivateNote: &note})
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, c.DeletePayment(payment)) })
+	found, err := c.FindPaymentByID(payment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &note, found.PrivateNote)
+
+	zero := "0"
+	deposit, err := c.CreateDeposit(&DepositCreateInput{
+		DepositToAccountRef: refs.bank, TxnDate: newTodayDate(), PrivateNote: &note,
+		Line: []DepositLine{
+			{Amount: "5.00", LinkedTxn: []LinkedTxn{{TxnID: payment.ID, TxnType: "Payment", TxnLineID: &zero}}},
+			{Amount: "7.00", DetailType: "DepositLineDetail", DepositLineDetail: &DepositLineDetail{AccountRef: refs.income}},
+		},
+	})
+	require.NoError(t, err)
+	// Cleanups run last-in first-out: the deposit goes before its payment.
+	t.Cleanup(func() { assert.NoError(t, c.DeleteDeposit(deposit)) })
+	foundDeposit, err := c.FindDepositByID(deposit.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &note, foundDeposit.PrivateNote)
+	assertAmount(t, 12, foundDeposit.TotalAmt)
+	require.Len(t, foundDeposit.Line, 2)
+	assert.Equal(t, payment.ID, foundDeposit.Line[0].LinkedTxn[0].TxnID)
+	require.NotNil(t, foundDeposit.Line[1].DepositLineDetail)
+	assert.Equal(t, refs.income.Value, foundDeposit.Line[1].DepositLineDetail.AccountRef.Value)
+
+	creditMemo, err := c.CreateCreditMemo(&CreditMemoCreateInput{CustomerRef: refs.customer, TxnDate: newTodayDate(), PrivateNote: &note, Line: salesLines})
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, c.DeleteCreditMemo(creditMemo)) })
+	foundCreditMemo, err := c.FindCreditMemoByID(creditMemo.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &note, foundCreditMemo.PrivateNote)
+
+	estimate, err := c.CreateEstimate(&EstimateCreateInput{CustomerRef: refs.customer, TxnDate: newTodayDate(), PrivateNote: &note, Line: salesLines})
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, c.DeleteEstimate(estimate)) })
+	foundEstimate, err := c.FindEstimateByID(estimate.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &note, foundEstimate.PrivateNote)
 }

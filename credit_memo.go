@@ -18,6 +18,7 @@ type CreditMemo struct {
 	TxnDate      *Date         `json:",omitempty"`
 	CustomerRef  ReferenceType `json:",omitempty"`
 	CustomerMemo *MemoRef      `json:",omitempty"`
+	PrivateNote  *string       `json:",omitempty"`
 	ProjectRef   *ReferenceType `json:",omitempty"`
 	BillAddr     *Address      `json:",omitempty"`
 	ShipAddr     *Address      `json:",omitempty"`
@@ -40,6 +41,7 @@ type CreditMemoCreateInput struct {
 	DocNumber    *string        `json:",omitempty"`
 	TxnDate      *Date          `json:",omitempty"`
 	CustomerMemo *MemoRef       `json:",omitempty"`
+	PrivateNote  *string        `json:",omitempty"`
 	ProjectRef   *ReferenceType `json:",omitempty"`
 	BillAddr     *Address       `json:",omitempty"`
 	ShipAddr     *Address       `json:",omitempty"`
