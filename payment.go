@@ -17,6 +17,7 @@ type Payment struct {
 	TotalAmt            json.Number    `json:",omitempty"`
 	UnappliedAmt        json.Number    `json:",omitempty"`
 	TxnDate             *Date          `json:",omitempty"`
+	PrivateNote         *string        `json:",omitempty"`
 	DepositToAccountRef *ReferenceType `json:",omitempty"`
 	ProcessPayment      *bool          `json:",omitempty"`
 	Line                []PaymentLine  `json:",omitempty"`
@@ -34,6 +35,7 @@ type PaymentCreateInput struct {
 	CustomerRef         ReferenceType  `json:",omitempty"`
 	TotalAmt            json.Number    `json:",omitempty"`
 	TxnDate             *Date          `json:",omitempty"`
+	PrivateNote         *string        `json:",omitempty"`
 	DepositToAccountRef *ReferenceType `json:",omitempty"`
 	ProcessPayment      *bool          `json:",omitempty"`
 	Line                []PaymentLine  `json:",omitempty"`

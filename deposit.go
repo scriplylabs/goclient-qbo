@@ -15,6 +15,7 @@ type Deposit struct {
 	MetaData            *MetaData     `json:",omitempty"`
 	DepositToAccountRef ReferenceType `json:",omitempty"`
 	TxnDate             *Date         `json:",omitempty"`
+	PrivateNote         *string       `json:",omitempty"`
 	TotalAmt            json.Number   `json:",omitempty"`
 	Line                []PaymentLine `json:",omitempty"`
 }
@@ -24,7 +25,8 @@ type Deposit struct {
 type DepositCreateInput struct {
 	DepositToAccountRef ReferenceType `json:",omitempty"`
 	Line                []PaymentLine
-	TxnDate             *Date `json:",omitempty"`
+	TxnDate             *Date   `json:",omitempty"`
+	PrivateNote         *string `json:",omitempty"`
 }
 
 // CreateDeposit creates the given deposit within QuickBooks

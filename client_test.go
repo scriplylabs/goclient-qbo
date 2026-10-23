@@ -96,3 +96,26 @@ func TestRequestErrorKeepsItsCause(t *testing.T) {
 
 	require.ErrorAs(t, err, &tokenSourceError{})
 }
+
+// A transaction's PrivateNote is sent on create and read back from QuickBooks' answer.
+func TestPrivateNoteRoundTrips(t *testing.T) {
+	client, _ := NewTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "note", body["PrivateNote"])
+		entity := map[string]any{"PrivateNote": body["PrivateNote"]}
+		_ = json.NewEncoder(w).Encode(map[string]any{"Payment": entity, "Deposit": entity, "CreditMemo": entity, "Estimate": entity})
+	})
+	note := "note"
+
+	payment, err := client.CreatePayment(&PaymentCreateInput{PrivateNote: &note})
+	require.NoError(t, err)
+	deposit, err := client.CreateDeposit(&DepositCreateInput{PrivateNote: &note})
+	require.NoError(t, err)
+	creditMemo, err := client.CreateCreditMemo(&CreditMemoCreateInput{PrivateNote: &note})
+	require.NoError(t, err)
+	estimate, err := client.CreateEstimate(&EstimateCreateInput{PrivateNote: &note})
+	require.NoError(t, err)
+
+	assert.Equal(t, []*string{&note, &note, &note, &note}, []*string{payment.PrivateNote, deposit.PrivateNote, creditMemo.PrivateNote, estimate.PrivateNote})
+}

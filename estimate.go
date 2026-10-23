@@ -17,6 +17,7 @@ type Estimate struct {
 	TxnStatus    *string       `json:",omitempty"`
 	CustomerRef  ReferenceType `json:",omitempty"`
 	CustomerMemo *MemoRef      `json:",omitempty"`
+	PrivateNote  *string       `json:",omitempty"`
 	BillAddr     *Address      `json:",omitempty"`
 	ShipAddr     *Address      `json:",omitempty"`
 	PrintStatus  *string       `json:",omitempty"`
@@ -38,6 +39,7 @@ type EstimateCreateInput struct {
 	TxnDate      *Date          `json:",omitempty"`
 	TxnStatus    *string        `json:",omitempty"`
 	CustomerMemo *MemoRef       `json:",omitempty"`
+	PrivateNote  *string        `json:",omitempty"`
 	BillAddr     *Address       `json:",omitempty"`
 	ShipAddr     *Address       `json:",omitempty"`
 	PrintStatus  *string        `json:",omitempty"`
