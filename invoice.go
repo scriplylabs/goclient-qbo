@@ -91,9 +91,13 @@ type DeliveryInfo struct {
 	DeliveryTime DateTime
 }
 
+// LinkedTxn links a line to another transaction. TxnLineID names the linked
+// transaction's line; a deposit line banking a payment needs it ("0" for a
+// Payment's own line).
 type LinkedTxn struct {
-	TxnID   string `json:"TxnId"`
-	TxnType string `json:"TxnType"`
+	TxnID     string  `json:"TxnId"`
+	TxnType   string  `json:"TxnType"`
+	TxnLineID *string `json:"TxnLineId,omitempty"`
 }
 
 type TxnTaxDetail struct {

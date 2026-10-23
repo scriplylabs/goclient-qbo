@@ -17,14 +17,43 @@ type Deposit struct {
 	TxnDate             *Date         `json:",omitempty"`
 	PrivateNote         *string       `json:",omitempty"`
 	TotalAmt            json.Number   `json:",omitempty"`
-	Line                []PaymentLine `json:",omitempty"`
+	Line                []DepositLine `json:",omitempty"`
+}
+
+// DepositLine is a line of a Deposit: either funds already received, such as
+// a Payment in Undeposited Funds, named by LinkedTxn; or money deposited
+// directly, from the account in DepositLineDetail, with DetailType
+// "DepositLineDetail".
+//
+//	DepositLine{Amount: "5.00", LinkedTxn: []LinkedTxn{{TxnID: paymentID, TxnType: "Payment", TxnLineID: &zero}}}
+//	DepositLine{Amount: "5.00", DetailType: "DepositLineDetail", DepositLineDetail: &DepositLineDetail{AccountRef: income}}
+type DepositLine struct {
+	ID                string             `json:"Id,omitempty"`
+	LineNum           *int               `json:",omitempty"`
+	Description       *string            `json:",omitempty"`
+	Amount            json.Number        `json:",omitempty"`
+	DetailType        string             `json:",omitempty"`
+	DepositLineDetail *DepositLineDetail `json:",omitempty"`
+	LinkedTxn         []LinkedTxn        `json:",omitempty"`
+}
+
+// DepositLineDetail is where a directly deposited line's money came from.
+// AccountRef is required; Entity is the customer, vendor or employee it came
+// from, with its Type set.
+type DepositLineDetail struct {
+	AccountRef       ReferenceType  `json:",omitempty"`
+	Entity           *ReferenceType `json:",omitempty"`
+	ClassRef         *ReferenceType `json:",omitempty"`
+	PaymentMethodRef *ReferenceType `json:",omitempty"`
+	CheckNum         *string        `json:",omitempty"`
+	TxnType          *string        `json:",omitempty"`
 }
 
 // DepositCreateInput contains the writable fields accepted when creating a Deposit.
 // DepositToAccountRef and Line are required; all other fields are optional.
 type DepositCreateInput struct {
 	DepositToAccountRef ReferenceType `json:",omitempty"`
-	Line                []PaymentLine
+	Line                []DepositLine
 	TxnDate             *Date   `json:",omitempty"`
 	PrivateNote         *string `json:",omitempty"`
 }
