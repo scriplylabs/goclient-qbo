@@ -56,3 +56,43 @@ func TestNewClientWithEndpoint(t *testing.T) {
 	assert.ErrorContains(t, err, "no OAuth endpoints")
 	assert.ErrorContains(t, client.RevokeToken("refresh"), "no OAuth endpoints")
 }
+
+// A 429 makes nothing, so a create must fail rather than return an empty
+// entity as if it had been made.
+func TestRateLimitedRequestFails(t *testing.T) {
+	client, _ := NewTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"Fault":{"Error":[{"Message":"message=ThrottleExceeded; errorCode=003001; statusCode=429","Detail":"Too many requests","code":"3001"}],"type":"ThrottleExceeded"}}`))
+	})
+
+	je, err := client.CreateJournalEntry(&JournalEntryCreateInput{})
+
+	assert.Nil(t, je)
+	var failure Failure
+	require.ErrorAs(t, err, &failure)
+	assert.Equal(t, "3001", failure.Fault.Error[0].Code)
+
+	_, err = client.CreateJournalEntry(&JournalEntryCreateInput{})
+	assert.ErrorContains(t, err, "waiting for rate limit", "throttled for a minute after")
+}
+
+type tokenSourceError struct{}
+
+func (tokenSourceError) Error() string { return "token source failed" }
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, tokenSourceError{}
+}
+
+// A transport's error, such as an oauth2 token source's, stays matchable
+// with errors.As through the client.
+func TestRequestErrorKeepsItsCause(t *testing.T) {
+	client, _ := NewTestClient(t, func(w http.ResponseWriter, r *http.Request) {})
+	client.Client = &http.Client{Transport: failingTransport{}}
+
+	_, err := client.CreateJournalEntry(&JournalEntryCreateInput{})
+
+	require.ErrorAs(t, err, &tokenSourceError{})
+}
