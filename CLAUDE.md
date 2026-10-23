@@ -122,7 +122,7 @@ Methods that take an optional query parameter accept `opts ...RequestOption` and
 
 ### Faults
 
-QBO sends two fault shapes, and `Failure` must decode both: validation faults use `Fault`/`Error` with a string `time`; authentication faults (401, and 403 for scope) use lowercase `fault`/`error` with `time` in epoch milliseconds. CDC and delete responses report `"status": "Deleted"` with a capital D.
+QBO sends two fault shapes, and `Failure` must decode both: validation faults use `Fault`/`Error` with a string `time`; authentication faults (401, and 403 for scope) use lowercase `fault`/`error` with `time` in epoch milliseconds. CDC and delete responses report `"status": "Deleted"` with a capital D. A 429 returns its failure (and throttles the client for a minute), never a decoded result: QuickBooks made nothing. Request errors wrap their cause with `%w`, so a transport's error (an oauth2 token source's) stays matchable with `errors.As`.
 
 ### Testing
 

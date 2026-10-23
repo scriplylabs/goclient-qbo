@@ -170,13 +170,13 @@ func (c *Client) req(method string, endpoint string, payloadData any, responseOb
 	if payloadData != nil {
 		marshalledJson, err = json.Marshal(payloadData)
 		if err != nil {
-			return fmt.Errorf("failed to marshal payload: %v", err)
+			return fmt.Errorf("failed to marshal payload: %w", err)
 		}
 	}
 
 	req, err := http.NewRequest(method, endpointURL.String(), bytes.NewBuffer(marshalledJson))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Add("Accept", "application/json")
@@ -184,7 +184,7 @@ func (c *Client) req(method string, endpoint string, payloadData any, responseOb
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %v", err)
+		return fmt.Errorf("failed to make request: %w", err)
 	}
 
 	defer func() {
@@ -197,18 +197,22 @@ func (c *Client) req(method string, endpoint string, payloadData any, responseOb
 	case http.StatusOK:
 		break
 	case http.StatusTooManyRequests:
+		// Refused, not answered: QuickBooks made nothing, so the body is a
+		// failure to return, never a result to decode.
 		c.throttled = true
 		go func(c *Client) {
 			time.Sleep(1 * time.Minute)
 			c.throttled = false
 		}(c)
+
+		return parseFailure(resp)
 	default:
 		return parseFailure(resp)
 	}
 
 	if responseObject != nil {
 		if err = json.NewDecoder(resp.Body).Decode(&responseObject); err != nil {
-			return fmt.Errorf("failed to unmarshal response into object: %v", err)
+			return fmt.Errorf("failed to unmarshal response into object: %w", err)
 		}
 	}
 
