@@ -58,14 +58,17 @@ type BillCreateInput struct {
 }
 
 // CreateBill creates the given Bill on the QuickBooks server, returning
-// the resulting Bill object.
-func (c *Client) CreateBill(input *BillCreateInput) (*Bill, error) {
+// the resulting Bill object. Given WithRequestID, a create QuickBooks has
+// seen before returns the bill it made then instead of a second one.
+//
+//	bill, err := client.CreateBill(&input, quickbooks.WithRequestID(key))
+func (c *Client) CreateBill(input *BillCreateInput, opts ...RequestOption) (*Bill, error) {
 	var resp struct {
 		Bill Bill
 		Time Date
 	}
 
-	if err := c.post("bill", input, &resp, nil); err != nil {
+	if err := c.post("bill", input, &resp, buildQueryParameters(opts)); err != nil {
 		return nil, err
 	}
 

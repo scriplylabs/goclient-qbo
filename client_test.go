@@ -16,7 +16,7 @@ func TestWithRequestID(t *testing.T) {
 	client, _ := NewTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		gotRequestIDs = append(gotRequestIDs, r.URL.Query().Get("requestid"))
 		assert.Equal(t, "65", r.URL.Query().Get("minorversion"))
-		_, _ = w.Write([]byte(`{"JournalEntry":{"Id":"7"},"Payment":{"Id":"8"},"BillPayment":{"Id":"9"}}`))
+		_, _ = w.Write([]byte(`{"JournalEntry":{"Id":"7"},"Payment":{"Id":"8"},"BillPayment":{"Id":"9"},"Bill":{"Id":"10"}}`))
 	})
 
 	_, err := client.CreateJournalEntry(&JournalEntryCreateInput{}, WithRequestID("je-1"))
@@ -25,10 +25,12 @@ func TestWithRequestID(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.CreateBillPayment(&BillPaymentCreateInput{}, WithRequestID("bp-1"))
 	require.NoError(t, err)
+	_, err = client.CreateBill(&BillCreateInput{}, WithRequestID("bill-1"))
+	require.NoError(t, err)
 	_, err = client.CreateJournalEntry(&JournalEntryCreateInput{})
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"je-1", "pay-1", "bp-1", ""}, gotRequestIDs)
+	assert.Equal(t, []string{"je-1", "pay-1", "bp-1", "bill-1", ""}, gotRequestIDs)
 }
 
 func TestNewClientWithEndpoint(t *testing.T) {
