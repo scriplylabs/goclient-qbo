@@ -100,3 +100,28 @@ func TestGetChangedEntitiesCapitalisedDeleted(t *testing.T) {
 	require.NotNil(t, result.Payments[0].Deleted)
 	assert.Equal(t, "154", result.Payments[0].Deleted.ID)
 }
+
+// A bill payment comes back under its entity name, BillPayment, whichever
+// way it paid; a deleted one as any entity's.
+func TestGetChangedEntitiesBillPayments(t *testing.T) {
+	const response = `{"CDCResponse":[{"QueryResponse":[{"BillPayment":[
+		{"domain":"QBO","Id":"401","SyncToken":"1","MetaData":{"CreateTime":"2026-10-15T09:00:00-07:00","LastUpdatedTime":"2026-10-16T10:00:00-07:00"},"VendorRef":{"value":"46"},"PayType":"Check","CheckPayment":{"BankAccountRef":{"value":"35"},"PrintStatus":"PrintComplete"},"TotalAmt":70,"TxnDate":"2026-10-15","Line":[{"Amount":70,"LinkedTxn":[{"TxnId":"21","TxnType":"Bill"}]}]},
+		{"domain":"QBO","status":"Deleted","Id":"402","MetaData":{"LastUpdatedTime":"2026-10-16T11:00:00-07:00"}}
+	],"startPosition":1,"maxResults":2,"totalCount":2}]}],"time":"2026-10-16T12:00:00.000-07:00"}`
+
+	client, _ := NewTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "BillPayment", r.URL.Query().Get("entities"))
+		w.Write([]byte(response))
+	})
+
+	result, err := client.GetChangedEntities([]string{"BillPayment"}, time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+	require.Len(t, result.BillPayments, 2)
+	require.NotNil(t, result.BillPayments[0].Entity)
+	assert.Equal(t, "401", result.BillPayments[0].Entity.ID)
+	assert.Equal(t, "Check", result.BillPayments[0].Entity.PayType)
+	require.Len(t, result.BillPayments[0].Entity.Line, 1)
+	assert.Equal(t, "21", result.BillPayments[0].Entity.Line[0].LinkedTxn[0].TxnID)
+	require.NotNil(t, result.BillPayments[1].Deleted)
+	assert.Equal(t, "402", result.BillPayments[1].Deleted.ID)
+}
