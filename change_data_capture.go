@@ -13,6 +13,7 @@ type CDCResponse struct {
 	Accounts      []MaybeDeleted[Account]
 	Attachables   []MaybeDeleted[Attachable]
 	Bills         []MaybeDeleted[Bill]
+	BillPayments  []MaybeDeleted[BillPayment]
 	Classes       []MaybeDeleted[Class]
 	CompanyInfos  []MaybeDeleted[CompanyInfo]
 	CreditMemos   []MaybeDeleted[CreditMemo]
@@ -41,6 +42,7 @@ func buildDispatch(result *CDCResponse) map[string]func(json.RawMessage) error {
 		"Account":      func(d json.RawMessage) error { return unmarshalEntities(&result.Accounts, d) },
 		"Attachable":   func(d json.RawMessage) error { return unmarshalEntities(&result.Attachables, d) },
 		"Bill":         func(d json.RawMessage) error { return unmarshalEntities(&result.Bills, d) },
+		"BillPayment":  func(d json.RawMessage) error { return unmarshalEntities(&result.BillPayments, d) },
 		"Class":        func(d json.RawMessage) error { return unmarshalEntities(&result.Classes, d) },
 		"CompanyInfo":  func(d json.RawMessage) error { return unmarshalEntities(&result.CompanyInfos, d) },
 		"CreditMemo":   func(d json.RawMessage) error { return unmarshalEntities(&result.CreditMemos, d) },
