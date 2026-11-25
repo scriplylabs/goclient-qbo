@@ -241,12 +241,14 @@ func TestSandboxPaymentAndBillPayment(t *testing.T) {
 	note := sandboxNote
 
 	payment, err := c.CreatePayment(&PaymentCreateInput{
-		CustomerRef: refs.customer, TotalAmt: "5.00", TxnDate: newTodayDate(), DepositToAccountRef: &refs.bank,
+		CustomerRef: refs.customer, TotalAmt: "5.00", TxnDate: newTodayDate(), DepositToAccountRef: &refs.bank, ARAccountRef: &refs.ar,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, c.DeletePayment(payment)) })
 	assert.Equal(t, refs.bank.Value, payment.DepositToAccountRef.Value)
 	assertAmount(t, 5, payment.UnappliedAmt)
+	require.NotNil(t, payment.ARAccountRef)
+	assert.Equal(t, refs.ar.Value, payment.ARAccountRef.Value)
 
 	bill, err := c.CreateBill(&BillCreateInput{VendorRef: refs.vendor, TxnDate: newTodayDate(), PrivateNote: &note, Line: []Line{{
 		Amount: "5.00", DetailType: "AccountBasedExpenseLineDetail",
