@@ -19,8 +19,12 @@ type Payment struct {
 	TxnDate             *Date          `json:",omitempty"`
 	PrivateNote         *string        `json:",omitempty"`
 	DepositToAccountRef *ReferenceType `json:",omitempty"`
-	ProcessPayment      *bool          `json:",omitempty"`
-	Line                []PaymentLine  `json:",omitempty"`
+	// ARAccountRef is the accounts receivable account the payment is
+	// booked against; QuickBooks uses the company's default when it is
+	// left out.
+	ARAccountRef   *ReferenceType `json:",omitempty"`
+	ProcessPayment *bool          `json:",omitempty"`
+	Line           []PaymentLine  `json:",omitempty"`
 }
 
 // PaymentLine represents a line item within a Payment.
@@ -37,8 +41,12 @@ type PaymentCreateInput struct {
 	TxnDate             *Date          `json:",omitempty"`
 	PrivateNote         *string        `json:",omitempty"`
 	DepositToAccountRef *ReferenceType `json:",omitempty"`
-	ProcessPayment      *bool          `json:",omitempty"`
-	Line                []PaymentLine  `json:",omitempty"`
+	// ARAccountRef is the accounts receivable account the payment is
+	// booked against; QuickBooks uses the company's default when it is
+	// left out.
+	ARAccountRef   *ReferenceType `json:",omitempty"`
+	ProcessPayment *bool          `json:",omitempty"`
+	Line           []PaymentLine  `json:",omitempty"`
 }
 
 // CreatePayment creates the given payment within QuickBooks.
